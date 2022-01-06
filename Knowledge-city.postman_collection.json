@@ -1,0 +1,124 @@
+{
+	"info": {
+		"_postman_id": "a31cff08-0b24-4a99-a170-f47a62981024",
+		"name": "Knowledge-city",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "username",
+							"value": "tito232",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "test",
+							"type": "text"
+						},
+						{
+							"key": "remember",
+							"value": "on",
+							"type": "text",
+							"disabled": true
+						}
+					]
+				},
+				"url": {
+					"raw": "{{domain}}/api/login",
+					"host": [
+						"{{domain}}"
+					],
+					"path": [
+						"api",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "getStudents",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{domain}}/api/getStudents",
+					"host": [
+						"{{domain}}"
+					],
+					"path": [
+						"api",
+						"getStudents"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "logout",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{domain}}/api/logout",
+					"host": [
+						"{{domain}}"
+					],
+					"path": [
+						"api",
+						"logout"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "domain",
+			"value": "city"
+		},
+		{
+			"key": "token",
+			"value": "1_!!tito232_!!44bb16eed76604bedc7925161ab444c12fce0af228bdbdcfc395902122f46430a44ae9d73f92d132b5a41deea9877e40a37ddad311b63b139b2d6177fa5d917a_!!83c8e70083c84af06b6af63565cb88286fdb50f0c96b9e45882bb6170eaefab0"
+		}
+	]
+}
