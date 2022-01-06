@@ -3,7 +3,6 @@
 use Api\Classes\Auth;
 use Api\Classes\Students;
 
-require_once system_path('Classes/Auth.php');
 require_once system_path('Classes/Students.php');
 
 /**

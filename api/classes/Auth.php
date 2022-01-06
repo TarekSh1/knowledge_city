@@ -6,8 +6,8 @@ use Api\Api;
 use PDO;
 use stdClass;
 
-require_once $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/config/Database.php';
-require_once $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/Api.php';
+require_once ($_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/config/Database.php');
+require_once ($_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/Api.php');
 
 class Auth extends Api
 {
