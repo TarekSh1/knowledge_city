@@ -13,6 +13,7 @@ It's pretty simple to configure my app in your environment, just do the followin
 6- I was asked to do just the backend code, but I thought it would be better to be a full app, so I did the front end also with jQuery - Ajax - css.
 7- the front-end is not matching the photos in the task, but I did it just so that we could fully experience the app through a user interface.
 8- username: tito232 , password: test.
+9- the main link is {{domain}}/login.html.
 
 If there's anything I forgot to say, please feel free to text me on Telegram @tito232.
 
