@@ -42,6 +42,9 @@ $(document).ready(function () {
                     var info = JSON.parse(data);
                     if (info.redirect) {
                         window.location.href = info.redirect;
+                    } else if (info.status === 'failed') {
+                        $('span.errMsg').html(info.msg);
+                        $('span.errMsg').removeClass('hide');
                     }
                 },
                 error: function (a, b) {
@@ -50,7 +53,11 @@ $(document).ready(function () {
                 }
             })
         }
-    })
+    });
+
+    $('input.initial').on('keypress', function () {
+        $('span.errMsg').addClass('hide');
+    });
 });
 
 function checkIfLogged(loginPage = true) {
@@ -64,6 +71,14 @@ function checkIfLogged(loginPage = true) {
         data: data,
         success: function (data) {
             var info = JSON.parse(data);
+
+            if (info.status === 'logged' && !loginPage) {
+                setTimeout(function () {
+                    $('.allContent').removeClass('hide');
+                    getResult();
+                }, 200)
+            }
+
             if (info.status === 'logged' && loginPage) {
                 window.location.href = info.redirect;
             } else if (info.status === 'not logged' && !loginPage) {
@@ -112,4 +127,44 @@ function loginViaToke(loginPage = true) {
             console.log(b);
         }
     })
+}
+
+function getResult(page = 1) {
+    var data = {
+        action: 'getStudents',
+        page: page
+    }
+
+    $.ajax({
+        url: "/api/ajax/ajax_helper.php",
+        type: "GET",
+        data:  data,
+        success: function(data){
+           var pagination = $('.pagination'),
+               info = JSON.parse(data),
+               table = $('.table');
+           table.html('');
+           console.log(info.res);
+           table.append($('<table></table>'))
+            var tableBody = $('.table table');
+            $.each(info.res, function(index) {
+                console.log(info.res[index].name);
+                var tr = $('<tr></tr>');
+                tr.appendTo(tableBody);
+                $('<td><div>' + info.res[index].group_name + '</div>' + '<div class="sName">' + info.res[index].name +'</div></td>').appendTo(tr);
+                $('<td style="text-align: end;"><div class="empty"> - </div>' + '<div>' + info.res[index].subject +'</div></td>').appendTo(tr);
+            });
+
+            pagination.html('');
+            for (let i = 1; i <= info.totalPages; i++) {
+                var selected = i === parseInt(info.currentPage) ? 'selected' : '';
+                pagination.append('<span onclick="getResult('+ i +')" class="'+selected+'" >' + i + '</span>');
+            }
+        },
+        error: function(a, b)
+        {
+            console.log(a);
+            console.log(b);
+        }
+    });
 }

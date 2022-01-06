@@ -1,8 +1,10 @@
 <?php
 
-use Api\Authentication\Auth;
+use Api\Classes\Auth;
+use Api\Classes\Students;
 
-require_once system_path('authentication/Auth.php');
+require_once system_path('Classes/Auth.php');
+require_once system_path('Classes/Students.php');
 
 /**
  * @param $path
@@ -42,6 +44,8 @@ function normalize_path($path)
     return $path;
 }
 
+
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($_POST['action'] === 'checkIfLogged') {
@@ -71,6 +75,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($_POST['action'] === 'loginViaToken') {
         $authentication = new Auth();
         $result = $authentication->loginViaToken();
+        echo $result;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    if ($_GET['action'] === 'getStudents') {
+        $authentication = new Students();
+        $result = $authentication->getStudents();
         echo $result;
     }
 }

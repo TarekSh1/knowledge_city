@@ -1,6 +1,6 @@
 <?php
 
-namespace Api\Authentication;
+namespace Api\Classes;
 
 use Api\Config\Database;
 
@@ -19,6 +19,22 @@ class Auth
     {
         $database = new Database();
         $this->conn = $database->getConnection();
+    }
+
+    protected function response($data, $status = 500) {
+        header("HTTP/1.1 " . $status . " " . $this->requestStatus($status));
+        return json_encode($data);
+    }
+
+    private function requestStatus($code): string
+    {
+        $status = array(
+            200 => 'OK',
+            404 => 'Not Found',
+            405 => 'Method Not Allowed',
+            500 => 'Internal Server Error',
+        );
+        return $status[$code] ?? $status[500];
     }
 
     /**
@@ -49,21 +65,25 @@ class Auth
             }
 
             $response = [
+                'status' => 'success',
                 'msg' => 'Login successful',
                 'redirect' => 'users.html'
             ];
 
-            return json_encode($response);
+        } else {
+            $response = [
+                'status' => 'failed',
+                'msg' => 'Username or Password incorrect',
+            ];
         }
 
-        $response = [
-            'msg' => 'Username or Password incorrect',
-        ];
-
-        return json_encode($response);
+        return $this->response($response, 200);
     }
 
-    private function generateRandomToken()
+    /**
+     * @return string
+     */
+    private function generateRandomToken(): string
     {
         return hash('sha512', time());
     }
@@ -103,14 +123,14 @@ class Auth
                     'redirect' => 'users.html'
                 ];
 
-                return json_encode($response);
+                return $this->response($response, 200);
             }
         }
         $response = [
             'status' => 'no saved token',
         ];
 
-        return json_encode($response);
+        return $this->response($response, 200);
     }
 
     private function fetchTokenByUserName($userId)
