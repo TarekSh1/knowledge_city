@@ -8,18 +8,15 @@ $(document).ready(function () {
         var data = '';
 
         if ($(this).data('action') === 'logout') {
-            data = {
-                action: 'logout',
-                users: true
-            }
+            var token = checkCookie('api_token');
             $.ajax({
                 type: "POST",
-                url: "/api/ajax/ajax_helper.php",
-                data: data,
+                headers: {"Authorization": 'Bearer ' + token},
+                url: "/api/logout",
+                data: {},
                 success: function (data) {
-                    console.log(data);
-                    var info = JSON.parse(data);
-                    window.location.href = info.redirect;
+                    $.removeCookie("api_token", {path: '/'});
+                    window.location.href = data.redirect;
                 },
                 error: function (a, b) {
                     console.log(a);
@@ -28,7 +25,6 @@ $(document).ready(function () {
             })
         } else {
             data = {
-                action: 'login',
                 username: username,
                 password: password,
                 remember: $('input:checkbox:checked').val(),
@@ -36,12 +32,14 @@ $(document).ready(function () {
 
             $.ajax({
                 type: "POST",
-                url: "/api/ajax/ajax_helper.php",
+                url: "/api/login",
                 data: data,
                 success: function (data) {
-                    var info = JSON.parse(data);
-                    if (info.redirect) {
-                        window.location.href = info.redirect;
+                    var info = data;
+                    var life = info.cookieLife > 1 ? info.cookieLife : '';
+                    $.cookie("api_token", info.cookie, {expires: parseInt(life), path: '/'});
+                    if (info.status === 'success') {
+                        window.location.href = 'users.html';
                     } else if (info.status === 'failed') {
                         $('span.errMsg').html(info.msg);
                         $('span.errMsg').removeClass('hide');
@@ -61,33 +59,29 @@ $(document).ready(function () {
 });
 
 function checkIfLogged(loginPage = true) {
-    var data = {
-        action: 'checkIfLogged',
+    var token = $.cookie("api_token");
+    if (!token && !loginPage) {
+        window.location.href = 'login.html';
     }
 
     $.ajax({
         type: "POST",
-        url: "/api/ajax/ajax_helper.php",
-        data: data,
+        headers: {"Authorization": 'Bearer ' + token},
+        url: "/api/checkIfLogged",
+        data: {},
         success: function (data) {
-            var info = JSON.parse(data);
+            var info = data;
 
             if (info.status === 'logged' && !loginPage) {
-                setTimeout(function () {
-                    $('.allContent').removeClass('hide');
-                    getResult();
-                }, 200)
+                $('.allContent').removeClass('hide');
             }
 
             if (info.status === 'logged' && loginPage) {
-                window.location.href = info.redirect;
+                window.location.href = 'users.html';
             } else if (info.status === 'not logged' && !loginPage) {
-                window.location.href = info.redirect;
-            } else {
-                if (checkToken('token')) {
-                    loginViaToke(loginPage);
-                }
+                window.location.href = 'login.html';
             }
+
         },
         error: function (a, b) {
             console.log(a);
@@ -96,7 +90,7 @@ function checkIfLogged(loginPage = true) {
     })
 }
 
-function checkToken(name) {
+function checkCookie(name) {
     var nameEQ = name + "=";
     var ca = document.cookie.split(';');
     for (var i = 0; i < ca.length; i++) {
@@ -107,62 +101,39 @@ function checkToken(name) {
     return null;
 }
 
-function loginViaToke(loginPage = true) {
-    var data = {
-        action: 'loginViaToken',
-    }
-
-    $.ajax({
-        type: "POST",
-        url: "/api/ajax/ajax_helper.php",
-        data: data,
-        success: function (data) {
-            var info = JSON.parse(data);
-            if (info.status === 'logged' && loginPage) {
-                window.location.href = info.redirect;
-            }
-        },
-        error: function (a, b) {
-            console.log(a);
-            console.log(b);
-        }
-    })
-}
-
 function getResult(page = 1) {
+    var token = checkCookie('api_token');
+
     var data = {
-        action: 'getStudents',
         page: page
     }
 
     $.ajax({
-        url: "/api/ajax/ajax_helper.php",
+        url: "/api/getStudents",
         type: "GET",
-        data:  data,
-        success: function(data){
-           var pagination = $('.pagination'),
-               info = JSON.parse(data),
-               table = $('.table');
-           table.html('');
-           console.log(info.res);
-           table.append($('<table></table>'))
+        headers: {"Authorization": 'Bearer ' + token},
+        data: data,
+        success: function (data) {
+            var pagination = $('.pagination'),
+                info = data,
+                table = $('.table');
+            table.html('');
+            table.append($('<table></table>'))
             var tableBody = $('.table table');
-            $.each(info.res, function(index) {
-                console.log(info.res[index].name);
+            $.each(info.res, function (index) {
                 var tr = $('<tr></tr>');
                 tr.appendTo(tableBody);
-                $('<td><div>' + info.res[index].group_name + '</div>' + '<div class="sName">' + info.res[index].name +'</div></td>').appendTo(tr);
-                $('<td style="text-align: end;"><div class="empty"> - </div>' + '<div>' + info.res[index].subject +'</div></td>').appendTo(tr);
+                $('<td><div>' + info.res[index].group_name + '</div>' + '<div class="sName">' + info.res[index].name + '</div></td>').appendTo(tr);
+                $('<td style="text-align: end;"><div class="empty"> - </div>' + '<div>' + info.res[index].subject + '</div></td>').appendTo(tr);
             });
 
             pagination.html('');
             for (let i = 1; i <= info.totalPages; i++) {
                 var selected = i === parseInt(info.currentPage) ? 'selected' : '';
-                pagination.append('<span onclick="getResult('+ i +')" class="'+selected+'" >' + i + '</span>');
+                pagination.append('<span onclick="getResult(' + i + ')" class="' + selected + '" >' + i + '</span>');
             }
         },
-        error: function(a, b)
-        {
+        error: function (a, b) {
             console.log(a);
             console.log(b);
         }

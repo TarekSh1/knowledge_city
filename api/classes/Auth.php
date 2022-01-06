@@ -2,39 +2,23 @@
 
 namespace Api\Classes;
 
-use Api\Config\Database;
+use Api\Api;
+use PDO;
+use stdClass;
 
 require_once $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/config/Database.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/Api.php';
 
-class Auth
+class Auth extends Api
 {
 
     // database connection and table name
-    private $conn;
+
     private $table_name = 'users';
 
-
-    // constructor with $db as database connection
-    public function __construct()
+    private function generateRandomToken(): string
     {
-        $database = new Database();
-        $this->conn = $database->getConnection();
-    }
-
-    protected function response($data, $status = 500) {
-        header("HTTP/1.1 " . $status . " " . $this->requestStatus($status));
-        return json_encode($data);
-    }
-
-    private function requestStatus($code): string
-    {
-        $status = array(
-            200 => 'OK',
-            404 => 'Not Found',
-            405 => 'Method Not Allowed',
-            500 => 'Internal Server Error',
-        );
-        return $status[$code] ?? $status[500];
+        return hash('sha512', time());
     }
 
     /**
@@ -42,32 +26,37 @@ class Auth
      */
     public function login(): string
     {
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            return $this->response('NOT ALLOWED', 405);
+        }
+
         $pdo = $this->conn;
         $username = $_POST['username'];
+        $password = $_POST['password'];
+
         $sql = "select * from " . $this->table_name . " where user_name = :name ";
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['name' => $username]);
 
         $user_info = $stmt->fetch();
 
-        if (password_verify($_POST['password'], $user_info['password'])) {
-            session_start();
-            $_SESSION['username'] = $username;
+        if (password_verify($password, $user_info['password'])) {
+            $token = $this->generateRandomToken();
+            $this->storeApiTokenForUser($token, $user_info['id']);
+            $cookie = $user_info['id'] . '_!!' . $user_info['user_name'] . '_!!' . $token;
+            $mac = hash_hmac('sha256', $cookie, 'hashRules');
+            $cookie .= '_!!' . $mac;
+            $cookieLife = 1;
 
             if (isset($_POST['remember']) && $_POST['remember'] === 'on') {
-                $token = $this->generateRandomToken();
-                $this->storeTokenForUser($token, $user_info['id']);
-                $cookie = $user_info['id'] . '_!!' . $user_info['user_name'] . '_!!' .$token;
-                $mac = hash_hmac('sha256', $cookie, 'hashRules');
-                $cookie .= '_!!' . $mac;
-
-                setcookie('token', $cookie, strtotime('+30 days'), '/');
+                $cookieLife = 5 * 365;
             }
 
             $response = [
                 'status' => 'success',
                 'msg' => 'Login successful',
-                'redirect' => 'users.html'
+                'cookie' => $cookie,
+                'cookieLife' => $cookieLife,
             ];
 
         } else {
@@ -81,62 +70,129 @@ class Auth
     }
 
     /**
-     * @return string
-     */
-    private function generateRandomToken(): string
-    {
-        return hash('sha512', time());
-    }
-
-    /**
-     * @param $token
+     * @param $apiToken
      * @param $userId
      * @return void
      */
-    private function storeTokenForUser($token, $userId): void
+    private function storeApiTokenForUser($apiToken, $userId): void
     {
         $pdo = $this->conn;
-        $sql = "UPDATE users SET token = :token WHERE id = :id";
+        $sql = "UPDATE users SET api_token = :apiToken WHERE id = :id";
         $stmt = $pdo->prepare($sql);
-        $stmt->execute(['token' => $token, 'id' => $userId]);
+        $stmt->execute(['apiToken' => $apiToken, 'id' => $userId]);
     }
+
+    /**
+     * @param $cookie
+     * @return stdClass
+     */
+    private function getAllParams($cookie): stdClass
+    {
+        list ($user, $username, $cookieApiToken, $mac) = explode('_!!', $cookie);
+        $userId = str_replace('Bearer ','', $user);
+        $data = new stdClass();
+
+        if (hash_equals(hash_hmac('sha256', $userId . '_!!' . $username . '_!!' . $cookieApiToken, 'hashRules'), $mac)) {
+            $data->status = 'success';
+            $data->user = $userId;
+            $data->cookieApiToken = $cookieApiToken;
+            $data->mac = $mac;
+
+            return $data;
+        }
+
+        $data->status = 'failed';
+        return $data;
+    }
+
 
     /**
      * @return false|string
      */
-    public function loginViaToken()
+    public function checkApiToken()
     {
-        $cookie = $_COOKIE['token'] ?? '';
-        if ($cookie) {
-            list ($user, $username, $cookieToken, $mac) = explode('_!!', $cookie);
-            if (!hash_equals(hash_hmac('sha256', $user . '_!!' . $username . '_!!' . $cookieToken, 'hashRules'), $mac)) {
-                return json_encode(['msg' => 'Lol, Are you trying to hack my client?']);
-            }
-            $usertoken = $this->fetchTokenByUserName($user);
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            return $this->response('NOT ALLOWED', 405);
+        }
 
-            if (hash_equals($usertoken, $cookieToken)) {
-                session_start();
-                $_SESSION['username'] = $username;
+        $tokenApi = $this->getTokenApiFromHeaders();
 
-                $response = [
-                    'status' => 'logged',
-                    'redirect' => 'users.html'
-                ];
+        if ($crackingCookie = $this->getAllParams($tokenApi)) {
 
-                return $this->response($response, 200);
+            if ($crackingCookie->status === 'success') {
+                $userApiToken = $this->fetchApiTokenByUserName($crackingCookie->user);
+
+                if (hash_equals($userApiToken, $crackingCookie->cookieApiToken)) {
+                    $response = [
+                        'status' => 'logged',
+                        'redirect' => 'users.html'
+                    ];
+
+                    return $this->response($response, 200);
+                }
             }
         }
+
         $response = [
-            'status' => 'no saved token',
+            'status' => 'not logged',
         ];
 
         return $this->response($response, 200);
     }
 
-    private function fetchTokenByUserName($userId)
+    public function logout()
+    {
+        $tokenApi = $this->getTokenApiFromHeaders();
+        if ( $crackingCookie = $this->getAllParams($tokenApi)) {
+            $pdo = $this->conn;
+            $sql = "UPDATE users SET api_token = '' WHERE api_token = :api_token";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(['api_token' => $crackingCookie->cookieApiToken]);
+
+            return $this->response(['redirect' => 'login.html'], 200);
+        }
+
+        return $this->response(['msg' => 'something went wrong'], 500);
+    }
+
+    private function getTokenApiFromHeaders()
+    {
+        $headers = getallheaders();
+        return str_replace('bearer ','', $headers['Authorization']);
+    }
+    public function checkIfLogged()
+    {
+        $tokenApi = $this->getTokenApiFromHeaders();
+
+        if ( $crackingCookie = $this->getAllParams($tokenApi) ) {
+            $pdo = $this->conn;
+            $sql = "select api_token from " . $this->table_name . " where api_token = :apiToken ";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute(['apiToken' => $crackingCookie->cookieApiToken]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($row) {
+                $response = [
+                    'status' => 'logged',
+                ];
+            } else {
+                $response = [
+                    'status' => 'not logged',
+                ];
+            }
+
+        } else {
+            $response = ['status' => 'not logged'];
+        }
+
+        return $this->response($response, 200);
+
+    }
+
+    private function fetchApiTokenByUserName($userId)
     {
         $pdo = $this->conn;
-        $sql = "select token from " . $this->table_name . " where id = :userId ";
+        $sql = "select api_token from " . $this->table_name . " where id = :userId ";
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['userId' => $userId]);
 

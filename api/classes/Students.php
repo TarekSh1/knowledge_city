@@ -3,41 +3,32 @@
 
 namespace Api\Classes;
 
-use Api\Config\Database;
+use Api\Api;
+use Api\Classes\Auth;
 
+require_once  $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/classes/Auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/config/Database.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . DIRECTORY_SEPARATOR . 'api/Api.php';
 
-class Students
+class Students extends Api
 {
-    // database connection and table name
-    private $conn;
+
     private $table_name = 'students';
-
-    // constructor with $db as database connection
-    public function __construct()
-    {
-        $database = new Database();
-        $this->conn = $database->getConnection();
-    }
-
-    protected function response($data, $status = 500) {
-        header("HTTP/1.1 " . $status . " " . $this->requestStatus($status));
-        return json_encode($data);
-    }
-
-    private function requestStatus($code): string
-    {
-        $status = array(
-            200 => 'OK',
-            404 => 'Not Found',
-            405 => 'Method Not Allowed',
-            500 => 'Internal Server Error',
-        );
-        return $status[$code] ?? $status[500];
-    }
 
     public function getStudents()
     {
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            return $this->response('NOT ALLOWED', 405);
+        }
+
+        $auth = new Auth();
+
+        $tokenApi = json_decode($auth->checkIfLogged());
+
+        if ($tokenApi->status !== 'logged') {
+            return $this->response($tokenApi,401);
+        }
+
         $pdo = $this->conn;
         $limit = 5;
         $sql = "SELECT count(*) as total from " . $this->table_name;
@@ -54,7 +45,7 @@ class Students
 
         $starting_limit = ($page - 1) * $limit;
 
-        $show  = "SELECT * FROM students ORDER BY id ASC LIMIT $starting_limit, $limit";
+        $show  = "SELECT * FROM " . $this->table_name . " ORDER BY id ASC LIMIT $starting_limit, $limit";
 
         $r = $pdo->prepare($show);
         $r->execute();
