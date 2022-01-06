@@ -24,26 +24,28 @@ class Auth
     /**
      * @return string
      */
-    public function checkAuth(): string
+    public function login(): string
     {
         $pdo = $this->conn;
         $username = $_POST['username'];
-        $sql = "select `password` from " . $this->table_name . " where user_name = :name ";
+        $sql = "select * from " . $this->table_name . " where user_name = :name ";
         $stmt = $pdo->prepare($sql);
         $stmt->execute(['name' => $username]);
 
-        $password = $stmt->fetchColumn();
+        $user_info = $stmt->fetch();
 
-        if (password_verify($_POST['password'], $password)) {
+        if (password_verify($_POST['password'], $user_info['password'])) {
+            session_start();
+            $_SESSION['username'] = $username;
 
-//            if ($_POST['remember'] !== 'on') {
-//                setcookie("username", $username, 0 ,'/');
-//            }
+            if (isset($_POST['remember']) && $_POST['remember'] === 'on') {
+                $token = $this->generateRandomToken();
+                $this->storeTokenForUser($token, $user_info['id']);
+                $cookie = $user_info['id'] . '_!!' . $user_info['user_name'] . '_!!' .$token;
+                $mac = hash_hmac('sha256', $cookie, 'hashRules');
+                $cookie .= '_!!' . $mac;
 
-            if ($_POST['remember'] === 'on') {
-                ini_set('session.cookie_lifetime', 0);
-                session_start();
-                $_SESSION['username'] = $username;
+                setcookie('token', $cookie, strtotime('+30 days'), '/');
             }
 
             $response = [
@@ -59,5 +61,65 @@ class Auth
         ];
 
         return json_encode($response);
+    }
+
+    private function generateRandomToken()
+    {
+        return hash('sha512', time());
+    }
+
+    /**
+     * @param $token
+     * @param $userId
+     * @return void
+     */
+    private function storeTokenForUser($token, $userId): void
+    {
+        $pdo = $this->conn;
+        $sql = "UPDATE users SET token = :token WHERE id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(['token' => $token, 'id' => $userId]);
+    }
+
+    /**
+     * @return false|string
+     */
+    public function loginViaToken()
+    {
+        $cookie = $_COOKIE['token'] ?? '';
+        if ($cookie) {
+            list ($user, $username, $cookieToken, $mac) = explode('_!!', $cookie);
+            if (!hash_equals(hash_hmac('sha256', $user . '_!!' . $username . '_!!' . $cookieToken, 'hashRules'), $mac)) {
+                return json_encode(['msg' => 'Lol, Are you trying to hack my client?']);
+            }
+            $usertoken = $this->fetchTokenByUserName($user);
+
+            if (hash_equals($usertoken, $cookieToken)) {
+                session_start();
+                $_SESSION['username'] = $username;
+
+                $response = [
+                    'status' => 'logged',
+                    'redirect' => 'users.html'
+                ];
+
+                return json_encode($response);
+            }
+        }
+        $response = [
+            'status' => 'no saved token',
+        ];
+
+        return json_encode($response);
+    }
+
+    private function fetchTokenByUserName($userId)
+    {
+        $pdo = $this->conn;
+        $sql = "select token from " . $this->table_name . " where id = :userId ";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(['userId' => $userId]);
+
+        return $stmt->fetchColumn();
     }
 }

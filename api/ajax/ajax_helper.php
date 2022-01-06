@@ -48,7 +48,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ini_set('session.cookie_lifetime', 0);
         session_start();
 
-//        file_put_contents('z3.txt', $_SESSION['username'], 8);
         if (isset($_SESSION["username"])) {
             echo json_encode(['status' => 'logged', 'redirect' => 'users.html']);
         } else {
@@ -61,20 +60,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         session_start();
         session_destroy();
 
-        if (isset($_COOKIE['username'])) {
-            unset($_COOKIE['username']);
-            setcookie('username', null);
+        if (isset($_COOKIE['token'])) {
+            unset($_COOKIE['token']);
+            setcookie('token', null, -1, '/');
         }
 
         echo json_encode(['redirect' => 'login.html']);
     }
+
+    if ($_POST['action'] === 'loginViaToken') {
+        $authentication = new Auth();
+        $result = $authentication->loginViaToken();
+        echo $result;
+    }
 }
 
-if ($_POST['action'] === 'checkAuth') {
+if ($_POST['action'] === 'login') {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['password'], $_POST['username'])) {
             $authentication = new Auth();
-            $result = $authentication->checkAuth();
+            $result = $authentication->login();
             echo $result;
         }
     } else {
